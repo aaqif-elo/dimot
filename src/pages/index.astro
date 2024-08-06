@@ -1,37 +1,53 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import Card from "../components/Card.astro";
+import PollForm from "../components/PollForm.astro";
+import { db, Poll } from "astro:db";
+
+if (Astro.request.method === "POST") {
+  // parse form data
+  try {
+    const formData = await Astro.request.formData();
+    console.log(formData);
+    const name = formData.get("name");
+    const question = formData.get("question");
+
+    if (typeof question === "string") {
+      let parsedName = "";
+      if (typeof name === "string") {
+        parsedName = name.trim();
+      }
+      await db.insert(Poll).values({ author: parsedName, question });
+    }
+  } catch (err) {
+    console.log(err);
+  }
+
+}
 ---
 
 <Layout title="Dimot">
   <main>
-    <!-- <img src="./public/Shadhin.svg" alt="Shadhin" class="background-svg" /> -->
     <h1><span class="text-gradient">Dimot</span></h1>
-
-    <ul role="list" class="link-card-grid">
-      <Card
-        href="https://docs.astro.build/"
-        title="Documentation"
-        body="Learn how Astro works and explore the official API docs."
-      />
-      <Card
-        href="https://astro.build/integrations/"
-        title="Integrations"
-        body="Supercharge your project with new frameworks and libraries."
-      />
-      <Card
-        href="https://astro.build/themes/"
-        title="Themes"
-        body="Explore a galaxy of community-built starter themes."
-      />
-      <Card
-        href="https://astro.build/chat/"
-        title="Community"
-        body="Come say hi to our amazing Discord community. ❤️"
-      />
-    </ul>
   </main>
+  <button class="add-poll-button" id="open-poll-form-button" type="button"
+    >Create a Poll</button
+  >
+  <div id="poll-form-container" style="display: none;">
+    <PollForm />
+  </div>
 </Layout>
+
+<script>
+  const addPollButton = document.getElementById("open-poll-form-button");
+  const pollFormContainer = document.getElementById("poll-form-container");
+  console.log(addPollButton, pollFormContainer);
+  if (addPollButton && pollFormContainer) {
+    addPollButton.addEventListener("click", () => {
+      pollFormContainer.style.display =
+        pollFormContainer.style.display === "none" ? "block" : "none";
+    });
+  }
+</script>
 
 <style>
   main {
@@ -42,15 +58,6 @@ import Card from "../components/Card.astro";
     color: white;
     font-size: 20px;
     line-height: 1.6;
-  }
-  .background-svg {
-    position: absolute;
-    top: -25%;
-    left: 50%;
-    transform: translatex(-50%);
-    width: 100%;
-    height: auto;
-    z-index: -1;
   }
   h1 {
     font-size: 4rem;
@@ -66,31 +73,22 @@ import Card from "../components/Card.astro";
     background-size: 400%;
     background-position: 0%;
   }
-  .instructions {
-    margin-bottom: 2rem;
-    border: 1px solid rgba(var(--accent-light), 25%);
-    background: linear-gradient(
-      rgba(var(--accent-dark), 66%),
-      rgba(var(--accent-dark), 33%)
-    );
-    padding: 1.5rem;
-    border-radius: 8px;
-  }
-  .instructions code {
-    font-size: 0.8em;
-    font-weight: bold;
-    background: rgba(var(--accent-light), 12%);
-    color: rgb(var(--accent-light));
-    border-radius: 4px;
-    padding: 0.3em 0.4em;
-  }
-  .instructions strong {
-    color: rgb(var(--accent-light));
-  }
-  .link-card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(24ch, 1fr));
-    gap: 2rem;
-    padding: 0;
+
+  .add-poll-button {
+    display: block;
+    margin: 0 auto;
+    padding: 1rem 2rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    background-color: #bb0e0ef5;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+    position: fixed;
+    bottom: 10%;
+    right: 43%;
+    z-index: 2;
   }
 </style>
