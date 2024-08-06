@@ -1,0 +1,64 @@
+---
+
+---
+
+<div class="modal">
+  <div class="modal-content">
+    <h1>Create a poll</h1>
+    <form method="POST" class="create-poll-form">
+		<label for="name">Name</label>
+  		<input id="name" name="name" />
+
+  		<label for="question">Question</label>
+		<textarea id="question" name="question"></textarea>
+		
+	  	<button type="submit">Create poll</button>
+    </form>
+    <button>Close</button>
+  </div>
+</div>
+<style>
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 10;
+  }
+
+  h1 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+	font-size: 6rem;
+	color: rgba(0, 0, 0, 0.8);
+  }
+
+  form > input {
+    font-size: 2rem;
+
+  }
+
+  .modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #d6d6d6;
+    padding: 20px;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+	border-radius: 10px;
+  }
+
+  .create-poll-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+	gap: 10px;F;
+  }
+</style>
