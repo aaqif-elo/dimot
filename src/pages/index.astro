@@ -1,50 +1,178 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import PollForm from "../components/PollForm.astro";
-import { db, Poll } from "astro:db";
+import { db, Poll, PollChoice, eq } from "astro:db";
+import Polls from "../components/Poll.svelte";
+import { type IPoll, type IPollChoice } from "../types/interface";
 
 if (Astro.request.method === "POST") {
   // parse form data
   try {
     const formData = await Astro.request.formData();
-    console.log(formData);
+    console.log(formData, formData.getAll("choice"));
     const name = formData.get("name");
     const question = formData.get("question");
+    const choices = formData.getAll("choice");
 
     if (typeof question === "string") {
       let parsedName = "";
       if (typeof name === "string") {
         parsedName = name.trim();
       }
-      await db.insert(Poll).values({ author: parsedName, question });
+
+      if (choices.length < 2) {
+        console.log("Not enough choices");
+        return;
+      }
+
+      const pollId = await db
+        .insert(Poll)
+        .values({ author: parsedName, question });
+      if (!pollId) {
+        console.log("Error creating poll");
+      }
+
+      if (typeof pollId.lastInsertRowid === "bigint") {
+        const choicesToEnter: { choice: string; pollId: number }[] = [];
+        choices.forEach((choice) => {
+          if (typeof choice === "string") {
+            choicesToEnter.push({
+              choice: choice,
+              pollId: Number(pollId.lastInsertRowid),
+            });
+          }
+        });
+
+        await db.insert(PollChoice).values(choicesToEnter);
+      }
     }
   } catch (err) {
     console.log(err);
   }
-
 }
+
+const results = await db
+  .select()
+  .from(Poll)
+  .leftJoin(PollChoice, eq(Poll.id, PollChoice.pollId))
+  .all();
+
+const pollsWithChoices: { Poll: IPoll; Choices: IPollChoice[] }[] = [];
+
+results.forEach((result) => {
+  if (result.PollChoice) {
+    if (
+      !pollsWithChoices.some((poll) => Number(poll.Poll.id) === result.Poll.id)
+    ) {
+      pollsWithChoices.push({
+        Poll: result.Poll,
+        Choices: [result.PollChoice],
+      });
+    } else {
+      pollsWithChoices.forEach((poll) => {
+        if (Number(poll.Poll.id) === result.Poll.id) {
+          poll.Choices.push(result.PollChoice!);
+        }
+      });
+    }
+  }
+});
+
+console.log(results, pollsWithChoices);
 ---
 
 <Layout title="Dimot">
   <main>
     <h1><span class="text-gradient">Dimot</span></h1>
+    {
+      pollsWithChoices.map((pollWithChoices) => (
+        <Polls
+          question={pollWithChoices.Poll.question}
+          choices={pollWithChoices.Choices}
+          totalVotes={pollWithChoices.Poll.voteCount}
+          creator={pollWithChoices.Poll.author}
+          createdAt={pollWithChoices.Poll.createdAt}
+        />
+      ))
+    }
   </main>
   <button class="add-poll-button" id="open-poll-form-button" type="button"
     >Create a Poll</button
   >
   <div id="poll-form-container" style="display: none;">
-    <PollForm />
+    <div class="modal">
+      <div class="modal-content">
+        <button class="close-button" id="close-poll-form-button">X</button>
+        <h1>Create a poll</h1>
+        <form method="POST" class="create-poll-form">
+          <label for="name">Name</label>
+          <input id="name" name="name" />
+
+          <label for="question">Question</label>
+          <textarea id="question" name="question" class="question-textarea"
+          ></textarea>
+
+          <div id="choices-container">
+            <label>Choices</label>
+            <div class="choice-inputs">
+              <input
+                type="text"
+                name="choice"
+                placeholder="Enter a choice"
+                required
+              />
+              <input
+                type="text"
+                name="choice"
+                placeholder="Enter a choice"
+                required
+              />
+            </div>
+          </div>
+
+          <button type="button" id="add-choice-button">Add Choice</button>
+
+          <button type="submit">Create poll</button>
+        </form>
+      </div>
+    </div>
   </div>
 </Layout>
 
 <script>
-  const addPollButton = document.getElementById("open-poll-form-button");
   const pollFormContainer = document.getElementById("poll-form-container");
-  console.log(addPollButton, pollFormContainer);
-  if (addPollButton && pollFormContainer) {
-    addPollButton.addEventListener("click", () => {
-      pollFormContainer.style.display =
-        pollFormContainer.style.display === "none" ? "block" : "none";
+  const addChoiceButton = document.getElementById("add-choice-button");
+  const choicesContainer = document.getElementById("choices-container");
+
+  if (pollFormContainer) {
+    const addPollButton = document.getElementById("open-poll-form-button");
+    if (addPollButton) {
+      addPollButton.addEventListener("click", () => {
+        pollFormContainer.style.display =
+          pollFormContainer.style.display === "none" ? "block" : "none";
+      });
+    }
+
+    const closeButton = document.getElementById("close-poll-form-button");
+    if (closeButton) {
+      closeButton.addEventListener("click", () => {
+        pollFormContainer.style.display = "none";
+      });
+    }
+  }
+
+  if (addChoiceButton && choicesContainer) {
+    addChoiceButton.addEventListener("click", () => {
+      const choiceInputs = choicesContainer.querySelector(".choice-inputs");
+      if (choiceInputs) {
+        const newChoice = document.createElement("input");
+        newChoice.type = "text";
+        newChoice.name = "choice";
+        newChoice.placeholder = "Enter a choice";
+        newChoice.required = true;
+        choiceInputs.appendChild(newChoice);
+      } else {
+        console.error("Choice inputs container not found");
+      }
     });
   }
 </script>
@@ -90,5 +218,91 @@ if (Astro.request.method === "POST") {
     bottom: 10%;
     right: 43%;
     z-index: 2;
+  }
+
+  .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 10;
+    font-size: 1.5rem;
+  }
+
+  h1 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 6rem;
+    color: rgba(0, 0, 0, 0.8);
+  }
+
+  form > input {
+    font-size: 1.5rem;
+  }
+
+  .modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #d6d6d6;
+    padding: 20px;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-radius: 10px;
+  }
+
+  .create-poll-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .question-textarea {
+    width: 100%;
+    height: 100px;
+    resize: none;
+    font-size: 1.5rem;
+  }
+
+  .close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 20px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+  }
+
+  #choices-container {
+    width: 100%;
+  }
+
+  .choice-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  #add-choice-button {
+    margin-top: 10px;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  #add-choice-button:hover {
+    background-color: #45a049;
   }
 </style>
